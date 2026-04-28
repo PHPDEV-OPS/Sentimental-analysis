@@ -9,21 +9,29 @@ import dash_bootstrap_components as dbc
 import nltk
 from nltk.corpus import stopwords
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
 import pandas as pd
 import plotly.express as px
+from sklearn.decomposition import NMF
+from sklearn.feature_extraction.text import TfidfVectorizer
 from textblob import TextBlob
 
 DATA_PATH = Path(__file__).resolve().parent / "Dataset" / "twitter_dataset.csv"
 SENTIMENT_ORDER = ["Positive", "Neutral", "Negative"]
 BRAND_OPTIONS = ["All", "Apple", "Samsung", "Both", "Other"]
 TOKEN_PATTERN = re.compile(r"[A-Za-z]{2,}")
+TOPIC_APPLE = [1, 4]
+TOPIC_SAMSUNG = [3]
 
 
 def ensure_nltk_data():
     resources = [
         ("sentiment/vader_lexicon.zip", "vader_lexicon"),
         ("tokenizers/punkt.zip", "punkt"),
+        ("tokenizers/punkt_tab", "punkt_tab"),
         ("corpora/stopwords", "stopwords"),
+        ("corpora/wordnet", "wordnet"),
     ]
     for resource_path, resource_name in resources:
         try:
@@ -104,10 +112,11 @@ def load_data():
     except ValueError as exc:
         return pd.DataFrame(), str(exc)
 
+    df = apply_topic_model(df, stop_words)
     return df, None
 
 
-def filter_dataframe(df, keyword, sentiments, brand, polarity_range, subjectivity_range):
+def filter_dataframe(df, keyword, sentiments, brand_method, brand, polarity_range, subjectivity_range):
     if df.empty:
         return df
     filtered = df.copy()
@@ -120,7 +129,10 @@ def filter_dataframe(df, keyword, sentiments, brand, polarity_range, subjectivit
         filtered = filtered[filtered["final_sentiment"].isin(sentiments)]
 
     if brand and brand != "All":
-        filtered = filtered[filtered["brand"] == brand]
+        if brand_method == "topic":
+            filtered = filtered[filtered["brand_topic"] == brand]
+        else:
+            filtered = filtered[filtered["brand"] == brand]
 
     if polarity_range:
         filtered = filtered[
@@ -228,18 +240,78 @@ def build_top_terms(df, top_n, stop_words):
     return fig
 
 
-def build_brand_comparison(df):
-    if df.empty or "brand" not in df.columns:
+def preprocess_for_topic_modeling(text, stop_words, lemmatizer):
+    tokens = word_tokenize(text.lower())
+    filtered = [
+        lemmatizer.lemmatize(token)
+        for token in tokens
+        if token.isalpha() and token not in stop_words
+    ]
+    return " ".join(filtered)
+
+
+def apply_topic_model(df, stop_words):
+    if df.empty or "cleaned_tweet" not in df.columns:
+        df["dominant_topic"] = None
+        df["brand_topic"] = "Other"
+        return df
+
+    lemmatizer = WordNetLemmatizer()
+    df = df.copy()
+    df["preprocessed_tweet"] = df["cleaned_tweet"].apply(
+        lambda text: preprocess_for_topic_modeling(text, stop_words, lemmatizer)
+    )
+
+    non_empty = df["preprocessed_tweet"].str.strip().astype(bool)
+    if non_empty.sum() < 10:
+        df["dominant_topic"] = None
+        df["brand_topic"] = "Other"
+        return df
+
+    try:
+        tfidf_vectorizer = TfidfVectorizer(
+            max_df=0.90,
+            min_df=5,
+            stop_words="english",
+            ngram_range=(1, 1),
+        )
+        tfidf = tfidf_vectorizer.fit_transform(df.loc[non_empty, "preprocessed_tweet"])
+
+        n_components = 5
+        nmf_model = NMF(
+            n_components=n_components,
+            random_state=42,
+            init="nndsvda",
+            max_iter=200,
+        )
+        nmf_topic_features = nmf_model.fit_transform(tfidf)
+        df.loc[non_empty, "dominant_topic"] = nmf_topic_features.argmax(axis=1)
+    except ValueError:
+        df["dominant_topic"] = None
+
+    df["brand_topic"] = "Other"
+    if df["dominant_topic"].notna().any():
+        df.loc[df["dominant_topic"].isin(TOPIC_APPLE), "brand_topic"] = "Apple"
+        df.loc[df["dominant_topic"].isin(TOPIC_SAMSUNG), "brand_topic"] = "Samsung"
+
+    return df
+
+
+def build_brand_comparison(df, brand_method):
+    if df.empty:
         return px.bar(title="No brand comparison data available")
-    compare_df = df[df["brand"].isin(["Apple", "Samsung"])]
+    label_column = "brand_topic" if brand_method == "topic" else "brand"
+    if label_column not in df.columns:
+        return px.bar(title="No brand comparison data available")
+    compare_df = df[df[label_column].isin(["Apple", "Samsung"])]
     if compare_df.empty:
         return px.bar(title="No Apple/Samsung tweets found")
     sentiment_counts = (
-        compare_df.groupby(["brand", "final_sentiment"]).size().reset_index(name="count")
+        compare_df.groupby([label_column, "final_sentiment"]).size().reset_index(name="count")
     )
     fig = px.bar(
         sentiment_counts,
-        x="brand",
+        x=label_column,
         y="count",
         color="final_sentiment",
         barmode="group",
@@ -250,15 +322,18 @@ def build_brand_comparison(df):
     return fig
 
 
-def build_brand_summary(df):
+def build_brand_summary(df, brand_method):
     if df.empty:
         return pd.DataFrame(columns=["brand", "tweets", "avg_score", "positive_pct", "negative_pct"])
-    compare_df = df[df["brand"].isin(["Apple", "Samsung"])]
+    label_column = "brand_topic" if brand_method == "topic" else "brand"
+    if label_column not in df.columns:
+        return pd.DataFrame(columns=["brand", "tweets", "avg_score", "positive_pct", "negative_pct"])
+    compare_df = df[df[label_column].isin(["Apple", "Samsung"])]
     if compare_df.empty:
         return pd.DataFrame(columns=["brand", "tweets", "avg_score", "positive_pct", "negative_pct"])
     summary = (
         compare_df
-        .groupby("brand")
+        .groupby(label_column)
         .apply(
             lambda group: pd.Series({
                 "tweets": len(group),
@@ -269,6 +344,7 @@ def build_brand_summary(df):
         )
         .reset_index()
     )
+    summary = summary.rename(columns={label_column: "brand"})
     return summary
 
 
@@ -383,7 +459,16 @@ else:
                         value=SENTIMENT_ORDER,
                         inline=True,
                     ),
-                    dbc.Label("Brand", className="mt-3"),
+                    dbc.Label("Brand Method", className="mt-3"),
+                    dbc.Select(
+                        id="brand-method",
+                        options=[
+                            {"label": "Topic modeling", "value": "topic"},
+                            {"label": "Keyword detection", "value": "keyword"},
+                        ],
+                        value="topic",
+                    ),
+                    dbc.Label("Brand Filter", className="mt-3"),
                     dbc.Select(
                         id="brand-filter",
                         options=[{"label": option, "value": option} for option in BRAND_OPTIONS],
@@ -526,18 +611,28 @@ app.layout = dbc.Container(content, fluid=True)
     [
         Input("keyword-input", "value"),
         Input("sentiment-filter", "value"),
+        Input("brand-method", "value"),
         Input("brand-filter", "value"),
         Input("polarity-range", "value"),
         Input("subjectivity-range", "value"),
         Input("top-terms-count", "value"),
     ],
 )
-def update_dashboard(keyword, sentiments, brand, polarity_range, subjectivity_range, top_terms_count):
-    filtered = filter_dataframe(df, keyword, sentiments, brand, polarity_range, subjectivity_range)
+def update_dashboard(keyword, sentiments, brand_method, brand, polarity_range, subjectivity_range, top_terms_count):
+    filtered = filter_dataframe(
+        df,
+        keyword,
+        sentiments,
+        brand_method,
+        brand,
+        polarity_range,
+        subjectivity_range,
+    )
     total, avg_polarity, avg_subjectivity, positive_pct, negative_pct = build_metrics(filtered)
 
-    apple_df = filtered[filtered["brand"] == "Apple"] if not filtered.empty else filtered
-    samsung_df = filtered[filtered["brand"] == "Samsung"] if not filtered.empty else filtered
+    brand_column = "brand_topic" if brand_method == "topic" else "brand"
+    apple_df = filtered[filtered[brand_column] == "Apple"] if not filtered.empty else filtered
+    samsung_df = filtered[filtered[brand_column] == "Samsung"] if not filtered.empty else filtered
     apple_total, apple_polarity, _, apple_positive, apple_negative = build_metrics(apple_df)
     samsung_total, samsung_polarity, _, samsung_positive, samsung_negative = build_metrics(samsung_df)
 
@@ -545,8 +640,8 @@ def update_dashboard(keyword, sentiments, brand, polarity_range, subjectivity_ra
     polarity_fig = build_polarity_histogram(filtered)
     scatter_fig = build_scatter(filtered)
     top_terms_fig = build_top_terms(filtered, int(top_terms_count or 10), stop_words)
-    brand_compare_fig = build_brand_comparison(filtered)
-    brand_summary = build_brand_summary(filtered)
+    brand_compare_fig = build_brand_comparison(filtered, brand_method)
+    brand_summary = build_brand_summary(filtered, brand_method)
     brand_summary_table = make_table(brand_summary, max_rows=6)
 
     if filtered.empty:
@@ -560,7 +655,7 @@ def update_dashboard(keyword, sentiments, brand, polarity_range, subjectivity_ra
         pos_table = make_table(pos_df[["cleaned_tweet", "combined_sentiment_score"]])
         neg_table = make_table(neg_df[["cleaned_tweet", "combined_sentiment_score"]])
         all_table = make_table(
-            filtered[["cleaned_tweet", "final_sentiment", "combined_sentiment_score", "brand"]].head(200),
+            filtered[["cleaned_tweet", "final_sentiment", "combined_sentiment_score", brand_column]].head(200),
             max_rows=12,
         )
 
