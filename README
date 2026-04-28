@@ -1,18 +1,24 @@
-# Twitter Dataset Sentiment Analysis
+# Twitter Dataset Sentiment Analysis Dashboard
 
 ## Introduction
-This document provides an overview and instructions for a Twitter dataset Sentiment Analysis Dashboard. The app analyzes a local CSV dataset, computes TextBlob polarity and subjectivity plus NLTK VADER compound scores and presents the results in an interactive Plotly Dash interface. The dashboard includes filters, KPI snapshots, distributions and brand comparisons (Apple vs Samsung) to support a clear presentation.
+This project delivers an interactive Dash dashboard for sentiment analysis on a Twitter dataset. It reads a local CSV file, computes TextBlob polarity/subjectivity plus NLTK VADER compound scores, and visualizes results with filters, KPI snapshots, distributions, and an Apple vs Samsung comparison.
 
 ## Features
-*   **Dataset-driven analysis**: Loads tweets from `Dataset/twitter_dataset.csv` for consistent, reproducible insights.
-*   **Dual sentiment scoring**: Uses TextBlob polarity and VADER compound scores, combined into a single sentiment score.
-*   **Interactive dashboard**: Filter and explore the data with:
-    *   Keyword search, sentiment selection, brand selection, polarity and subjectivity ranges.
-    *   KPI cards (total tweets, average polarity, average subjectivity, positive and negative share).
-    *   Sentiment distribution, score distribution, and polarity vs subjectivity scatter.
-    *   Top terms visualization.
-    *   Apple and Samsung snapshots, plus direct comparison.
-    *   Top positive/negative tweets and a filtered tweet table.
+- **Dataset-driven analysis**: Loads tweets from `Dataset/twitter_dataset.csv` for consistent, reproducible insights.
+- **Dual sentiment scoring**: Uses TextBlob polarity and VADER compound scores, combined into a single sentiment score.
+- **Interactive dashboard**:
+    - Keyword search, sentiment selection, brand selection, polarity and subjectivity ranges.
+    - KPI cards (total tweets, average polarity, average subjectivity, positive and negative share).
+    - Sentiment distribution, score distribution, and polarity vs subjectivity scatter.
+    - Top terms visualization.
+    - Apple and Samsung snapshots, plus direct comparison.
+    - Top positive/negative tweets and a filtered tweet table.
+
+## Project Structure
+- `app_from_notebook.py` - Main Dash application.
+- `Dataset/twitter_dataset.csv` - Input dataset.
+- `Sentiment_analysis.ipynb` - Original notebook analysis.
+- `Twitter Sentiment Analysis Tool Documentation` - Detailed documentation.
 
 ## Technical Details
 
@@ -32,35 +38,32 @@ VADER is a lexicon and rule-based sentiment analysis tool that is specifically a
 *   **Positive (pos)**: The proportion of text that was rated as positive.
 *   **Neutral (neu)**: The proportion of text that was rated as neutral.
 *   **Negative (neg)**: The proportion of text that was rated as negative.
-*   **Compound**: A normalized, weighted composite score ranging from -1 (most extreme negative) to +1 (most extreme positive). This is the score primarily used in this Analysis.
+*   **Compound**: A normalized, weighted composite score ranging from -1 (most extreme negative) to +1 (most extreme positive). This is the score primarily used in this analysis.
 
 To provide a more robust sentiment score, this analysis combines the TextBlob polarity and VADER compound score by averaging them.
 
 ## How to Run the App
 
 ### Prerequisites
-*   Python 3.x
-*   Required Python packages:
-    *   `textblob`
-    *   `nltk`
-    *   `plotly`
-    *   `dash`
-    *   `pandas`
-    *   `dash-bootstrap-components`
+- Python 3.x
+- Required Python packages:
+    - `textblob`
+    - `nltk`
+    - `plotly`
+    - `dash`
+    - `pandas`
+    - `dash-bootstrap-components`
 
 ### Running the Dashboard
-1.  **Verify the dataset**: Ensure `Dataset/twitter_dataset.csv` exists.
-2.  **Install NLTK data** (first run only):
-    *   `python -c "import nltk; nltk.download('vader_lexicon'); nltk.download('punkt'); nltk.download('stopwords')"`
-3.  **Start the Dash application**: Execute `python app_from_notebook.py` in your terminal.
-4.  **Access the dashboard**: Open your web browser and navigate to `http://127.0.0.1:8050/`.
+1. **Verify the dataset**: Ensure `Dataset/twitter_dataset.csv` exists.
+2. **Install NLTK data** (first run only):
+   - `python -c "import nltk; nltk.download('vader_lexicon'); nltk.download('punkt'); nltk.download('stopwords')"`
+3. **Start the Dash application**: Run `python app_from_notebook.py`.
+4. **Access the dashboard**: Open `http://127.0.0.1:8050/`.
 
 ## Dashboard Usage
+1. **Filters panel**: Use keyword, sentiment, brand, polarity, and subjectivity filters.
+2. **Overview tab**: Review KPI cards and distribution charts.
+3. **Apple vs Samsung tab**: Compare brand snapshots and sentiment split.
+4. **Tweets tab**: Inspect top positive/negative tweets and browse the filtered table.
 
-1.  **Filters panel**: Use keyword, sentiment, brand, polarity, and subjectivity filters to focus the analysis.
-2.  **Overview tab**: Review KPI cards and distribution charts for quick insights.
-3.  **Apple vs Samsung tab**: Compare brand snapshots, sentiment split, and summary table.
-4.  **Tweets tab**: Inspect top positive and negative tweets and browse the filtered table.
-
-## Presentation Notes
-*   **Storyline**: Can use the notebook for refrence on the analysis.
