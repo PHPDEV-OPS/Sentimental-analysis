@@ -378,6 +378,7 @@ df, load_error = load_data()
 last_updated = datetime.now().strftime("%b %d, %Y %I:%M %p")
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server  # Expose the server variable for deployments
 
 app.index_string = """
 <!DOCTYPE html>

@@ -1,0 +1,8 @@
+dash==4.1.0
+dash_bootstrap_components==2.0.4
+nltk==3.9.4
+pandas==3.0.2
+plotly==6.7.0
+scikit_learn==1.8.0
+textblob==0.20.0
+gunicorn
