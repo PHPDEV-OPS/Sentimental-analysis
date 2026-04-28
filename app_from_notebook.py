@@ -1,7 +1,7 @@
-import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+import re
 
 import dash
 from dash import Input, Output, dcc, html, dash_table
@@ -17,6 +17,8 @@ from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
 from textblob import TextBlob
 
+
+# Configuration
 DATA_PATH = Path(__file__).resolve().parent / "Dataset" / "twitter_dataset.csv"
 SENTIMENT_ORDER = ["Positive", "Neutral", "Negative"]
 BRAND_OPTIONS = ["All", "Apple", "Samsung", "Both", "Other"]
@@ -25,6 +27,7 @@ TOPIC_APPLE = [1, 4]
 TOPIC_SAMSUNG = [3]
 
 
+# Data prep helpers
 def ensure_nltk_data():
     resources = [
         ("sentiment/vader_lexicon.zip", "vader_lexicon"),
@@ -99,6 +102,62 @@ def analyze_dataframe(df):
     return df
 
 
+def preprocess_for_topic_modeling(text, stop_words, lemmatizer):
+    tokens = word_tokenize(text.lower())
+    filtered = [
+        lemmatizer.lemmatize(token)
+        for token in tokens
+        if token.isalpha() and token not in stop_words
+    ]
+    return " ".join(filtered)
+
+
+def apply_topic_model(df, stop_words):
+    if df.empty or "cleaned_tweet" not in df.columns:
+        df["dominant_topic"] = None
+        df["brand_topic"] = "Other"
+        return df
+
+    lemmatizer = WordNetLemmatizer()
+    df = df.copy()
+    df["preprocessed_tweet"] = df["cleaned_tweet"].apply(
+        lambda text: preprocess_for_topic_modeling(text, stop_words, lemmatizer)
+    )
+
+    non_empty = df["preprocessed_tweet"].str.strip().astype(bool)
+    if non_empty.sum() < 10:
+        df["dominant_topic"] = None
+        df["brand_topic"] = "Other"
+        return df
+
+    try:
+        tfidf_vectorizer = TfidfVectorizer(
+            max_df=0.90,
+            min_df=5,
+            stop_words="english",
+            ngram_range=(1, 1),
+        )
+        tfidf = tfidf_vectorizer.fit_transform(df.loc[non_empty, "preprocessed_tweet"])
+
+        nmf_model = NMF(
+            n_components=5,
+            random_state=42,
+            init="nndsvda",
+            max_iter=200,
+        )
+        nmf_topic_features = nmf_model.fit_transform(tfidf)
+        df.loc[non_empty, "dominant_topic"] = nmf_topic_features.argmax(axis=1)
+    except ValueError:
+        df["dominant_topic"] = None
+
+    df["brand_topic"] = "Other"
+    if df["dominant_topic"].notna().any():
+        df.loc[df["dominant_topic"].isin(TOPIC_APPLE), "brand_topic"] = "Apple"
+        df.loc[df["dominant_topic"].isin(TOPIC_SAMSUNG), "brand_topic"] = "Samsung"
+
+    return df
+
+
 def load_data():
     if not DATA_PATH.exists():
         return pd.DataFrame(), f"Dataset not found at {DATA_PATH}."
@@ -149,6 +208,7 @@ def filter_dataframe(df, keyword, sentiments, brand_method, brand, polarity_rang
     return filtered
 
 
+# Charts and derived metrics
 def build_metrics(df):
     if df.empty:
         return 0, 0.0, 0.0, 0.0, 0.0
@@ -240,63 +300,6 @@ def build_top_terms(df, top_n, stop_words):
     return fig
 
 
-def preprocess_for_topic_modeling(text, stop_words, lemmatizer):
-    tokens = word_tokenize(text.lower())
-    filtered = [
-        lemmatizer.lemmatize(token)
-        for token in tokens
-        if token.isalpha() and token not in stop_words
-    ]
-    return " ".join(filtered)
-
-
-def apply_topic_model(df, stop_words):
-    if df.empty or "cleaned_tweet" not in df.columns:
-        df["dominant_topic"] = None
-        df["brand_topic"] = "Other"
-        return df
-
-    lemmatizer = WordNetLemmatizer()
-    df = df.copy()
-    df["preprocessed_tweet"] = df["cleaned_tweet"].apply(
-        lambda text: preprocess_for_topic_modeling(text, stop_words, lemmatizer)
-    )
-
-    non_empty = df["preprocessed_tweet"].str.strip().astype(bool)
-    if non_empty.sum() < 10:
-        df["dominant_topic"] = None
-        df["brand_topic"] = "Other"
-        return df
-
-    try:
-        tfidf_vectorizer = TfidfVectorizer(
-            max_df=0.90,
-            min_df=5,
-            stop_words="english",
-            ngram_range=(1, 1),
-        )
-        tfidf = tfidf_vectorizer.fit_transform(df.loc[non_empty, "preprocessed_tweet"])
-
-        n_components = 5
-        nmf_model = NMF(
-            n_components=n_components,
-            random_state=42,
-            init="nndsvda",
-            max_iter=200,
-        )
-        nmf_topic_features = nmf_model.fit_transform(tfidf)
-        df.loc[non_empty, "dominant_topic"] = nmf_topic_features.argmax(axis=1)
-    except ValueError:
-        df["dominant_topic"] = None
-
-    df["brand_topic"] = "Other"
-    if df["dominant_topic"].notna().any():
-        df.loc[df["dominant_topic"].isin(TOPIC_APPLE), "brand_topic"] = "Apple"
-        df.loc[df["dominant_topic"].isin(TOPIC_SAMSUNG), "brand_topic"] = "Samsung"
-
-    return df
-
-
 def build_brand_comparison(df, brand_method):
     if df.empty:
         return px.bar(title="No brand comparison data available")
@@ -348,6 +351,7 @@ def build_brand_summary(df, brand_method):
     return summary
 
 
+# UI helpers
 def make_card(title, value, suffix=""):
     display_value = f"{value:.2f}{suffix}" if isinstance(value, float) else f"{value}{suffix}"
     return dbc.Card(
@@ -370,6 +374,7 @@ def make_table(df, max_rows=10):
     )
 
 
+# App bootstrap
 ensure_nltk_data()
 stop_words = set(stopwords.words("english"))
 stop_words.update(["amp", "https", "http", "rt", "co"])
@@ -378,7 +383,7 @@ df, load_error = load_data()
 last_updated = datetime.now().strftime("%b %d, %Y %I:%M %p")
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server  # Expose the server variable for deployments
+server = app.server
 
 app.index_string = """
 <!DOCTYPE html>
@@ -584,6 +589,7 @@ else:
 app.layout = dbc.Container(content, fluid=True)
 
 
+# Callbacks
 @app.callback(
     [
         Output("kpi-total", "children"),
