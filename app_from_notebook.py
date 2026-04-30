@@ -382,7 +382,11 @@ stop_words.update(["amp", "https", "http", "rt", "co"])
 df, load_error = load_data()
 last_updated = datetime.now().strftime("%b %d, %Y %I:%M %p")
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(
+    __name__,
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
+)
 server = app.server
 
 app.index_string = """
@@ -404,6 +408,9 @@ app.index_string = """
                 --bg: #F4F6FB;
                 --accent: #FF8C42;
                 --accent-dark: #1F2A44;
+            }
+            * {
+                box-sizing: border-box;
             }
             body {
                 font-family: "Space Grotesk", sans-serif;
@@ -434,6 +441,31 @@ app.index_string = """
                 border-radius: 18px;
                 padding: 16px;
                 box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+            }
+            @media (max-width: 991.98px) {
+                .app-shell {
+                    padding: 16px 6px 32px;
+                }
+                .sidebar {
+                    margin-bottom: 16px;
+                }
+                .main-panel {
+                    padding-left: 0;
+                }
+                .kpi-card h2 {
+                    font-size: 1.5rem;
+                }
+            }
+            @media (max-width: 575.98px) {
+                .app-shell {
+                    padding: 12px 4px 24px;
+                }
+                .sidebar {
+                    padding: 16px;
+                }
+                .rc-slider-mark-text {
+                    font-size: 10px;
+                }
             }
         </style>
     </head>
@@ -515,7 +547,7 @@ else:
             ], md=3),
             dbc.Col([
                 html.Div([
-                    html.H1("Twitter Sentiment Analysis Dashboard", className="fw-bold"),
+                    html.H1("Twitter Product Sentiment Analysis", className="fw-bold"),
                     html.P("Interactive sentiment insights inspired by the notebook results.", className="text-muted"),
                 ]),
                 dbc.Row([
