@@ -46,6 +46,7 @@
 | [NLTK](https://www.nltk.org/) | 3.9.4 | VADER sentiment scoring & tokenisation |
 | [scikit-learn](https://scikit-learn.org/) | 1.8.0 | TF-IDF & NMF topic modelling |
 | [Gunicorn](https://gunicorn.org/) | latest | Production WSGI server |
+| [Python](https://python.org/) | latest | Programming Language |
 
 ---
 
