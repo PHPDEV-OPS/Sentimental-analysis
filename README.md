@@ -34,7 +34,7 @@
 
 ---
 
-## Tech Stack
+## Tools and Tech Stack
 
 | Library | Version | Purpose |
 |---|---|---|
@@ -46,6 +46,9 @@
 | [NLTK](https://www.nltk.org/) | 3.9.4 | VADER sentiment scoring & tokenisation |
 | [scikit-learn](https://scikit-learn.org/) | 1.8.0 | TF-IDF & NMF topic modelling |
 | [Gunicorn](https://gunicorn.org/) | latest | Production WSGI server |
+| [Python](https://python.org/) | latest | Programming Language |
+
+ **Copilot** – For Documenting on Readme File
 
 ---
 
@@ -126,7 +129,7 @@ The app combines TextBlob polarity and VADER compound by averaging them into a s
 ### Running the Dashboard
 
 ```bash
-python app_from_notebook.py
+python app.py
 ```
 
 Then open **http://127.0.0.1:8050/** in your browser.
