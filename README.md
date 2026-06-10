@@ -131,6 +131,10 @@ The app combines TextBlob polarity and VADER compound by averaging them into a s
 ```bash
 python app.py
 ```
+or 
+```bash
+python app_from_notebook.py
+```
 
 Then open **http://127.0.0.1:8050/** in your browser.
 
