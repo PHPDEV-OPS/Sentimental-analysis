@@ -129,7 +129,7 @@ The app combines TextBlob polarity and VADER compound by averaging them into a s
 ### Running the Dashboard
 
 ```bash
-python app_from_notebook.py
+python app.py
 ```
 
 Then open **http://127.0.0.1:8050/** in your browser.
